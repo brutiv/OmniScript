@@ -8,8 +8,10 @@ import logging
 from typing import List, Any, Callable
 from datetime import datetime
 
+
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
+
 
 class Monitor:
     _instance = None
