@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "omniscript"
+version = "0.0.1"
+description = "Background monitoring and event hooks for Python scripts"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+  { name = "Brutiv" }
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Topic :: Software Development :: Libraries",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/brutiv/OmniScript"
+Repository = "https://github.com/brutiv/OmniScript"
+Issues = "https://github.com/brutiv/OmniScript/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["omniscript"]
