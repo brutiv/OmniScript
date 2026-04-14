@@ -1,6 +1,8 @@
 import sys
 import os
 import signal
+import asyncio
+import inspect
 import threading
 import time
 import atexit
@@ -36,6 +38,8 @@ class Monitor:
                 "error": [],
                 "stop": [],
             }
+            self._loop = None
+            self._async_mode = False
         self._heartbeat_interval = heartbeat_interval
         self.crash_safe = crash_safe
 
@@ -63,6 +67,19 @@ class Monitor:
         self._thread.start()
         self._dispatch_event("start", {"pid": os.getpid()})
 
+    async def start_async(self) -> None:
+        if self._running:
+            logger.warning("Monitor is already running.")
+            return
+
+        self._running = True
+        self._async_mode = True
+        self._install_hooks()
+        self._loop = asyncio.get_running_loop()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+        await self._dispatch_event_async("start", {"pid": os.getpid()})
+
     def stop(self) -> None:
         if not self._running:
             return
@@ -73,6 +90,13 @@ class Monitor:
             self._thread.join(timeout=5.0)
         self._dispatch_event("stop", None)
 
+    async def stop_async(self) -> None:
+        if not self._running:
+            return
+        self._running = False
+        self._restore_hooks()
+        await self._dispatch_event_async("stop", None)
+
     def _run(self) -> None:
         last_heartbeat = time.time()
         while self._running:
@@ -80,10 +104,17 @@ class Monitor:
             if now - last_heartbeat >= self._heartbeat_interval:
                 last_heartbeat = now
                 readable_time = datetime.fromtimestamp(now).isoformat()
-                self._dispatch_event("heartbeat", {
+                payload = {
                     "timestamp": now,
                     "readable": readable_time
-                })
+                }
+                if self._async_mode and self._loop and self._loop.is_running():
+                    asyncio.run_coroutine_threadsafe(
+                        self._dispatch_event_async("heartbeat", payload),
+                        self._loop,
+                    )
+                else:
+                    self._dispatch_event("heartbeat", payload)
             time.sleep(0.1)
 
     def _safe_excepthook(self, exc_type, exc_value, exc_traceback):
@@ -107,7 +138,12 @@ class Monitor:
         callbacks = self._event_registry.get(event_type, [])
         for cb in callbacks:
             try:
-                cb(event_type, data)
+                result = cb(event_type, data)
+                if inspect.isawaitable(result):
+                    if self._loop and self._loop.is_running():
+                        asyncio.run_coroutine_threadsafe(result, self._loop)
+                    else:
+                        asyncio.run(result)
             except Exception as exc:
                 logger.error(
                     "Error in callback for event: '%s': %s: %s",
@@ -123,9 +159,38 @@ class Monitor:
                 except Exception:
                     logger.error("Error in 'error' event handler.", exc_info=True)
 
+    async def _dispatch_event_async(self, event_type: str, data: Any) -> None:
+        callbacks = list(self._event_registry.get(event_type, []))
+        for cb in callbacks:
+            try:
+                result = cb(event_type, data)
+                if inspect.isawaitable(result):
+                    await result
+            except Exception as exc:
+                logger.error(
+                    "Error in callback for event: '%s': %s: %s",
+                    event_type,
+                    type(exc).__name__,
+                    exc,
+                    exc_info=True
+                )
+                try:
+                    await self._dispatch_event_async(
+                        "error", {"event_type": event_type, "exception": exc}
+                    )
+                except Exception:
+                    logger.error("Error in 'error' event handler.", exc_info=True)
+
     def _signal_handler(self, signum, frame):
-        self._dispatch_event("shutdown-signal", {"signal": signum})
-        self.stop()
+        if self._async_mode and self._loop and self._loop.is_running():
+            asyncio.run_coroutine_threadsafe(
+                self._dispatch_event_async("shutdown-signal", {"signal": signum}),
+                self._loop,
+            )
+            asyncio.run_coroutine_threadsafe(self.stop_async(), self._loop)
+        else:
+            self._dispatch_event("shutdown-signal", {"signal": signum})
+            self.stop()
 
 
 def _on_process_exit():

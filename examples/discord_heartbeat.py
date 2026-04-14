@@ -1,8 +1,6 @@
 from omniscript import Monitor, monitor
 import time
 
-webhook_url = "https://discord.com/api/webhooks/YOUR_WEBHOOK_URL"
-
 @monitor("start")
 def on_start(event_type, data):
     print(f"Started with pid {data['pid']}")
@@ -19,6 +17,11 @@ def on_error(event_type, data):
 def on_stop(event_type, data):
     print("Stopped")
 
-Monitor(crash_safe=True, heartbeat_interval=60).start()
-while True:
-    time.sleep(1)
+monitor = Monitor(crash_safe=True, heartbeat_interval=60)
+
+try:
+    monitor.start()
+    while True:
+        time.sleep(1)
+except KeyboardInterrupt:
+    monitor.stop()

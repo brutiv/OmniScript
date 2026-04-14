@@ -13,11 +13,16 @@ def heartbeat(event_type, data):
 def crash_alert(event_type, data):
     print(f"Crash: {data['type']} - {data['exception']}")
 
-monitor_instance = Monitor(crash_safe=False, heartbeat_interval=10)
-monitor_instance.start()
+def main():
+    monitor_instance = Monitor(crash_safe=False, heartbeat_interval=10)
+    monitor_instance.start()
 
-for i in range(3):
-    print(f"Step {i + 1}")
-    time.sleep(2)
+    for i in range(3):
+        print(f"Step {i + 1}")
+        time.sleep(2)
 
-raise RuntimeError("demo failure")
+    print("Intentionally raising an error for demo purposes")
+    raise RuntimeError("demo failure")
+
+if __name__ == "__main__":
+    main()
