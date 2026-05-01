@@ -258,10 +258,6 @@ OmniScript/
 
 OmniScript is currently early-stage software. The core ideas are stable, but the API may evolve as the library grows.
 
-## License
-
-Add your preferred license here.
-
 ---
 
 OmniScript is built for developers who want a small, event-driven layer for scripts, services, bots, and background workers.
